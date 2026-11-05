@@ -62,19 +62,103 @@ def _draw_diya(draw, cx, cy, scale=1.0):
                   cx + int(35*scale), cy - int(35*scale)), fill=(255, 245, 192))
 
 
-def _make_scene(index, title):
+VISUAL_THEMES = {
+    "vishnu": {"label": "श्रीहरि की भक्ति", "top": (13, 30, 68), "bottom": (170, 112, 48), "glow": (255, 211, 112, 78), "symbol": "lotus"},
+    "shiva": {"label": "महादेव की आराधना", "top": (8, 28, 48), "bottom": (70, 112, 124), "glow": (164, 224, 255, 78), "symbol": "trident"},
+    "hanuman": {"label": "बजरंगबली की भक्ति", "top": (65, 19, 12), "bottom": (190, 78, 25), "glow": (255, 190, 80, 85), "symbol": "gada"},
+    "lakshmi": {"label": "माँ लक्ष्मी की कृपा", "top": (66, 20, 53), "bottom": (190, 115, 42), "glow": (255, 220, 125, 90), "symbol": "lotus"},
+    "moon": {"label": "चंद्रमा की शीतल आभा", "top": (8, 19, 49), "bottom": (73, 81, 123), "glow": (215, 226, 255, 95), "symbol": "moon"},
+    "general": {"label": "आज का भक्तिमय संदेश", "top": (20, 24, 57), "bottom": (125, 57, 64), "glow": (255, 184, 95, 55), "symbol": "diya"},
+}
+
+
+def _select_visual_theme(panchang):
+    """Choose a visual motif only from explicit observance/tithi data."""
+    day = panchang.get("day", {}) if isinstance(panchang, dict) else {}
+    festival_values = day.get("festivals") or panchang.get("festivals") or []
+    if isinstance(festival_values, str):
+        festival_values = [festival_values]
+    festival_text = " ".join(str(item) for item in festival_values).lower()
+    tithi = str(day.get("tithi_name", "")).lower()
+    weekday = str(day.get("weekday") or day.get("day_name") or "").lower()
+
+    # Explicit festival/observance names take priority over generic tithi cues.
+    if any(word in festival_text for word in ("ekadashi", "vaikuntha", "prabodhini", "devutthana")):
+        key = "vishnu"
+    elif any(word in festival_text for word in ("shiv", "pradosh", "somvati")):
+        key = "shiva"
+    elif any(word in festival_text for word in ("hanuman", "bajarang", "sankatmochan")):
+        key = "hanuman"
+    elif any(word in festival_text for word in ("lakshmi", "deepavali", "diwali", "dhanteras")):
+        key = "lakshmi"
+    elif any(word in festival_text for word in ("purnima", "pournami", "full moon")):
+        key = "moon"
+    elif "ekadashi" in tithi:
+        key = "vishnu"
+    elif "amavasya" in tithi:
+        key = "general"
+    elif "purnima" in tithi or "poornima" in tithi:
+        key = "moon"
+    elif weekday == "monday":
+        key = "shiva"
+    elif weekday == "tuesday":
+        key = "hanuman"
+    elif weekday == "thursday":
+        key = "vishnu"
+    elif weekday == "friday":
+        key = "lakshmi"
+    else:
+        key = "general"
+
+    return key, VISUAL_THEMES[key]
+
+
+def _draw_lotus(draw, cx, cy, scale=1.0, color=(255, 205, 120, 220)):
+    for angle in range(0, 360, 45):
+        import math
+        rad = math.radians(angle)
+        dx, dy = math.cos(rad), math.sin(rad)
+        px, py = cx + int(dx * 43 * scale), cy + int(dy * 43 * scale)
+        draw.ellipse((px-int(22*scale), py-int(38*scale), px+int(22*scale), py+int(38*scale)),
+                     fill=color)
+    draw.ellipse((cx-int(17*scale), cy-int(17*scale), cx+int(17*scale), cy+int(17*scale)),
+                 fill=(255, 238, 180, 245))
+
+
+def _draw_theme_symbol(draw, symbol, index):
+    cx, cy = WIDTH // 2, 610 + (index % 2) * 22
+    gold = (255, 218, 150, 225)
+    if symbol == "lotus":
+        _draw_lotus(draw, cx, cy, 1.45, gold)
+    elif symbol == "trident":
+        draw.line((cx, cy-115, cx, cy+105), fill=gold, width=13)
+        draw.arc((cx-70, cy-130, cx+5, cy+5), 180, 310, fill=gold, width=11)
+        draw.arc((cx-5, cy-130, cx+70, cy+5), 230, 360, fill=gold, width=11)
+        draw.line((cx-68, cy-122, cx, cy-48, cx+68, cy-122), fill=gold, width=11)
+    elif symbol == "gada":
+        draw.ellipse((cx-42, cy-108, cx+42, cy-24), outline=gold, width=13)
+        draw.line((cx, cy-24, cx, cy+125), fill=gold, width=18)
+        draw.line((cx-38, cy+125, cx+38, cy+125), fill=gold, width=13)
+    elif symbol == "moon":
+        draw.ellipse((cx-82, cy-82, cx+82, cy+82), fill=(230, 235, 255, 220))
+        draw.ellipse((cx-30, cy-105, cx+105, cy+30), fill=(30, 40, 78, 255))
+    else:
+        _draw_diya(draw, cx, cy+45, 1.05)
+
+
+def _make_scene(index, title, theme):
     palettes = [
-        ((16, 20, 52), (118, 48, 64)),
-        ((20, 27, 67), (150, 73, 48)),
-        ((16, 38, 58), (93, 91, 67)),
-        ((45, 22, 50), (135, 65, 44)),
-        ((13, 23, 49), (100, 54, 76)),
+        (theme["top"], theme["bottom"]),
+        (theme["top"], tuple(min(255, c + 12) for c in theme["bottom"])),
+        (tuple(max(0, c - 5) for c in theme["top"]), theme["bottom"]),
+        (theme["top"], tuple(min(255, c + 22) for c in theme["bottom"])),
+        (theme["top"], theme["bottom"]),
     ]
     top, bottom = palettes[index % len(palettes)]
     image = _gradient(top, bottom).convert("RGBA")
     glow = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    glow_draw.ellipse((130, 180, 590, 640), fill=(255, 184, 95, 48))
+    glow_draw.ellipse((95, 160, 625, 700), fill=theme["glow"])
     glow = glow.filter(ImageFilter.GaussianBlur(75))
     image = Image.alpha_composite(image, glow)
 
@@ -87,10 +171,11 @@ def _make_scene(index, title):
         radius = random.choice([1, 2, 3])
         draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill=(255, 226, 170, 145))
 
-    if index in (0, 1, 4):
-        _draw_temple(draw, 1040, (26, 17, 35, 255))
-    if index in (2, 3, 4):
-        _draw_diya(draw, WIDTH // 2, 870, 0.9 if index == 2 else 0.65)
+    # The central motif changes with the day's verified Panchang theme.
+    _draw_theme_symbol(draw, theme["symbol"], index)
+    _draw_temple(draw, 1060, (18, 15, 34, 255))
+    if index in (1, 3, 4) or theme["symbol"] == "diya":
+        _draw_diya(draw, WIDTH // 2, 900, 0.65)
 
     # Top and bottom dark translucent bands improve legibility.
     band = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
@@ -202,7 +287,7 @@ def _probe_duration(audio_path):
     return float(result.stdout.strip())
 
 
-def generate_video(narration, audio_file, output=OUTPUT):
+def generate_video(narration, audio_file, panchang=None, output=OUTPUT):
     audio_path = Path(audio_file)
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
@@ -220,10 +305,13 @@ def generate_video(narration, audio_file, output=OUTPUT):
         "राहुकाल और शुभ विचार",
         "आज का भक्तिमय संदेश",
     ]
+    theme_key, theme = _select_visual_theme(panchang or {})
+    print(f"Selected devotional visual theme: {theme_key} ({theme['label']})")
+    scene_titles[0] = theme["label"]
     scene_paths = []
     for index, title in enumerate(scene_titles):
         scene_path = work_dir / f"scene_{index}.jpg"
-        _make_scene(index, title).save(scene_path, quality=92)
+        _make_scene(index, title, theme).save(scene_path, quality=92)
         scene_paths.append(scene_path)
 
     subtitle_path = work_dir / "captions.ass"
