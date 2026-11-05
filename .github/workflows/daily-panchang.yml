@@ -29,6 +29,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Validate Python syntax
+        run: python -m compileall -q src
+
       - name: Generate Panchang and voice
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
