@@ -27,7 +27,20 @@ for Divya Kahaniyan.
 Use ONLY this verified Panchang data:
 {json.dumps(panchang, ensure_ascii=False)}
 
-Create a 45-60 second Hindi Panchang narration.
+Create a natural Hindi Panchang narration
+of approximately 60–75 seconds.
+
+Do not sacrifice important Panchang details
+to meet the duration.
+
+Include complete start and end timings
+for Rahu Kaal, Tithi, Nakshatra, Yoga
+and Karana wherever available.
+
+If a timing is unavailable in the source,
+omit it and flag it for review.
+
+Never invent or calculate timings.
 
 RULES:
 1. Use simple, natural Hindi.
