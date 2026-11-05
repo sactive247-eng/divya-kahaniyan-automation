@@ -58,7 +58,7 @@ def main():
     audio = generate_voice(script["narration"], script["voice"])
 
     print("Generating vertical Panchang video...")
-    video = generate_video(script["narration"], audio)
+    video = generate_video(script["narration"], audio, panchang=data)
 
     provider = script.get("generated_by", "AI provider")
     message = (
