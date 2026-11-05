@@ -1,3 +1,4 @@
+import hashlib
 import math
 import os
 import random
@@ -68,24 +69,29 @@ VISUAL_THEMES = {
     "hanuman": {"label": "बजरंगबली की भक्ति", "top": (65, 19, 12), "bottom": (190, 78, 25), "glow": (255, 190, 80, 85), "symbol": "gada"},
     "lakshmi": {"label": "माँ लक्ष्मी की कृपा", "top": (66, 20, 53), "bottom": (190, 115, 42), "glow": (255, 220, 125, 90), "symbol": "lotus"},
     "moon": {"label": "चंद्रमा की शीतल आभा", "top": (8, 19, 49), "bottom": (73, 81, 123), "glow": (215, 226, 255, 95), "symbol": "moon"},
+    "ganesha": {"label": "श्री गणेश की वंदना", "top": (75, 32, 12), "bottom": (190, 105, 36), "glow": (255, 205, 120, 95), "symbol": "diya"},
+    "surya": {"label": "सूर्य देव की उपासना", "top": (65, 25, 8), "bottom": (210, 112, 35), "glow": (255, 205, 90, 110), "symbol": "diya"},
     "general": {"label": "आज का भक्तिमय संदेश", "top": (20, 24, 57), "bottom": (125, 57, 64), "glow": (255, 184, 95, 55), "symbol": "diya"},
 }
 
 
 def _select_visual_theme(panchang):
-    """Choose a visual motif only from explicit observance/tithi data."""
-    day = panchang.get("day", {}) if isinstance(panchang, dict) else {}
-    festival_values = day.get("festivals") or panchang.get("festivals") or []
+    """Select a theme only from explicit festival and tithi data; never infer from weekday."""
+    root = panchang if isinstance(panchang, dict) else {}
+    day = root.get("day", {}) if isinstance(root.get("day", {}), dict) else {}
+    festival_values = day.get("festivals") or root.get("festivals") or []
     if isinstance(festival_values, str):
         festival_values = [festival_values]
     festival_text = " ".join(str(item) for item in festival_values).lower()
     tithi = str(day.get("tithi_name", "")).lower()
-    weekday = str(day.get("weekday") or day.get("day_name") or "").lower()
 
-    # Explicit festival/observance names take priority over generic tithi cues.
-    if any(word in festival_text for word in ("ekadashi", "vaikuntha", "prabodhini", "devutthana")):
+    if any(word in festival_text for word in ("ganesh", "ganesha", "vinayak", "sankashti")):
+        key = "ganesha"
+    elif any(word in festival_text for word in ("surya", "ratha saptami", "makar sankranti", "chhath")):
+        key = "surya"
+    elif any(word in festival_text for word in ("ekadashi", "vaikuntha", "prabodhini", "devutthana")):
         key = "vishnu"
-    elif any(word in festival_text for word in ("shiv", "pradosh", "somvati")):
+    elif any(word in festival_text for word in ("shiv", "pradosh", "somvati", "mahashivratri")):
         key = "shiva"
     elif any(word in festival_text for word in ("hanuman", "bajarang", "sankatmochan")):
         key = "hanuman"
@@ -95,22 +101,48 @@ def _select_visual_theme(panchang):
         key = "moon"
     elif "ekadashi" in tithi:
         key = "vishnu"
-    elif "amavasya" in tithi:
-        key = "general"
     elif "purnima" in tithi or "poornima" in tithi:
         key = "moon"
-    elif weekday == "monday":
-        key = "shiva"
-    elif weekday == "tuesday":
-        key = "hanuman"
-    elif weekday == "thursday":
-        key = "vishnu"
-    elif weekday == "friday":
-        key = "lakshmi"
     else:
         key = "general"
-
     return key, VISUAL_THEMES[key]
+
+
+def _library_background(theme_key, scene_index, date_key):
+    """Pick a stable, rotating, text-free image from the local artwork library."""
+    root = Path("assets") / "backgrounds"
+    extensions = {".jpg", ".jpeg", ".png", ".webp"}
+    candidates = []
+    for folder in (theme_key, "general"):
+        directory = root / folder
+        if directory.exists():
+            candidates = sorted(
+                path for path in directory.iterdir()
+                if path.is_file() and path.suffix.lower() in extensions
+            )
+        if candidates:
+            break
+    if not candidates:
+        return None
+    seed = hashlib.sha256(f"{date_key}:{theme_key}:{scene_index}".encode("utf-8")).digest()
+    return candidates[int.from_bytes(seed[:4], "big") % len(candidates)]
+
+
+def _cover_image(path):
+    """Crop a library image to the vertical 9:16 canvas without distortion."""
+    with Image.open(path) as source:
+        image = source.convert("RGB")
+    target_ratio = WIDTH / HEIGHT
+    source_ratio = image.width / image.height
+    if source_ratio > target_ratio:
+        new_width = int(image.height * target_ratio)
+        left = (image.width - new_width) // 2
+        image = image.crop((left, 0, left + new_width, image.height))
+    else:
+        new_height = int(image.width / target_ratio)
+        top = (image.height - new_height) // 2
+        image = image.crop((0, top, image.width, top + new_height))
+    return image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
 
 
 def _draw_lotus(draw, cx, cy, scale=1.0, color=(255, 205, 120, 220)):
@@ -146,7 +178,7 @@ def _draw_theme_symbol(draw, symbol, index):
         _draw_diya(draw, cx, cy+45, 1.05)
 
 
-def _make_scene(index, title, theme):
+def _make_scene(index, title, theme, background_path=None):
     palettes = [
         (theme["top"], theme["bottom"]),
         (theme["top"], tuple(min(255, c + 12) for c in theme["bottom"])),
@@ -155,12 +187,17 @@ def _make_scene(index, title, theme):
         (theme["top"], theme["bottom"]),
     ]
     top, bottom = palettes[index % len(palettes)]
-    image = _gradient(top, bottom).convert("RGBA")
+    image = (_cover_image(background_path) if background_path else _gradient(top, bottom)).convert("RGBA")
+    has_library_art = background_path is not None
     glow = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
     glow_draw.ellipse((95, 160, 625, 700), fill=theme["glow"])
     glow = glow.filter(ImageFilter.GaussianBlur(75))
-    image = Image.alpha_composite(image, glow)
+    if not has_library_art:
+        image = Image.alpha_composite(image, glow)
+    else:
+        shade = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 30))
+        image = Image.alpha_composite(image, shade)
 
     draw = ImageDraw.Draw(image)
     # Stars / floating light particles.
@@ -171,11 +208,12 @@ def _make_scene(index, title, theme):
         radius = random.choice([1, 2, 3])
         draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill=(255, 226, 170, 145))
 
-    # The central motif changes with the day's verified Panchang theme.
-    _draw_theme_symbol(draw, theme["symbol"], index)
-    _draw_temple(draw, 1060, (18, 15, 34, 255))
-    if index in (1, 3, 4) or theme["symbol"] == "diya":
-        _draw_diya(draw, WIDTH // 2, 900, 0.65)
+    # Use selected library artwork as the hero visual; retain vector scenes as fallback.
+    if not has_library_art:
+        _draw_theme_symbol(draw, theme["symbol"], index)
+        _draw_temple(draw, 1060, (18, 15, 34, 255))
+        if index in (1, 3, 4) or theme["symbol"] == "diya":
+            _draw_diya(draw, WIDTH // 2, 900, 0.65)
 
     # Top and bottom dark translucent bands improve legibility.
     band = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
@@ -313,9 +351,15 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT):
     print(f"Selected devotional visual theme: {theme_key} ({theme['label']})")
     scene_titles[0] = theme["label"]
     scene_paths = []
+    date_key = str((panchang or {}).get("day", {}).get("date", ""))
     for index, title in enumerate(scene_titles):
         scene_path = work_dir / f"scene_{index}.jpg"
-        _make_scene(index, title, theme).save(scene_path, quality=92)
+        artwork = _library_background(theme_key, index, date_key)
+        if artwork:
+            print(f"Scene {index + 1}: artwork library -> {artwork}")
+        else:
+            print(f"Scene {index + 1}: procedural fallback (no {theme_key}/general artwork installed)")
+        _make_scene(index, title, theme, background_path=artwork).save(scene_path, quality=92)
         scene_paths.append(scene_path)
 
     subtitle_path = work_dir / "captions.ass"
