@@ -122,7 +122,7 @@ def _parse_script(response_text, provider):
     # Edge TTS and the subtitle renderer.
     import unicodedata
     result["narration"] = unicodedata.normalize("NFC", result["narration"])
-    result["narration"] = re.sub(r"\\s+", " ", result["narration"]).strip()
+    result["narration"] = re.sub(r"\s+", " ", result["narration"]).strip()
     if len(result["narration"]) < 120:
         raise ValueError(f"{provider} narration is unexpectedly short; refusing low-quality output.")
     return result
