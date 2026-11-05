@@ -62,11 +62,11 @@ def main():
 
     provider = script.get("generated_by", "AI provider")
     message = (
-        "🙏 DIVYA KAHANIYAN\\n"
-        "आज का पंचांग\\n"
-        f"Script provider: {provider}\\n\\n"
+        "🙏 DIVYA KAHANIYAN\n"
+        "आज का पंचांग\n"
+        f"Script provider: {provider}\n\n"
         + script["narration"]
-        + "\\n\\nSource: shastrapanchangam.com"
+        + "\n\nSource: shastrapanchangam.com"
     )
 
     print("Sending text, audio and video to Telegram...")
