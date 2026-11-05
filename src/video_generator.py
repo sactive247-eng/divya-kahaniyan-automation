@@ -202,18 +202,18 @@ def _split_narration(text):
         sentence = sentence.strip()
         if not sentence:
             continue
-        if len(current) + len(sentence) <= 88:
+        if len(current) + len(sentence) <= 64:
             current = (current + " " + sentence).strip()
         else:
             if current:
                 pieces.append(current)
-            if len(sentence) <= 88:
+            if len(sentence) <= 64:
                 current = sentence
             else:
                 words = sentence.split()
                 current = ""
                 for word in words:
-                    if len(current) + len(word) + 1 > 78:
+                    if len(current) + len(word) + 1 > 58:
                         if current:
                             pieces.append(current)
                         current = word
@@ -252,7 +252,7 @@ def _write_subtitles(narration, duration, path):
             "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
             "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
             "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-            "Style: Hindi,Noto Sans Devanagari,34,&H00FFFFFF,&H000000FF,"
+            "Style: Hindi,Noto Sans Devanagari,31,&H00FFFFFF,&H000000FF,"
             "&HCC09091A,&H80000000,1,0,0,0,100,100,0,0,1,3,1,2,48,48,118,1\n\n"
             "[Events]\n"
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, "
