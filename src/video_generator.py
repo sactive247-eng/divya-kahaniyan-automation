@@ -140,28 +140,48 @@ def _split_narration(text):
 
 
 def _write_subtitles(narration, duration, path):
+    """Write ASS subtitles; libass/HarfBuzz handles Devanagari shaping."""
     segments = _split_narration(narration)
     weights = [max(1, len(segment)) for segment in segments]
     total = sum(weights)
     cursor = 0.0
 
     def stamp(seconds):
-        milliseconds = int(round(seconds * 1000))
-        hours, remainder = divmod(milliseconds, 3600000)
-        minutes, remainder = divmod(remainder, 60000)
-        secs, millis = divmod(remainder, 1000)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+        centiseconds = int(round(seconds * 100))
+        hours, remainder = divmod(centiseconds, 360000)
+        minutes, remainder = divmod(remainder, 6000)
+        secs, fraction = divmod(remainder, 100)
+        return f"{hours}:{minutes:02d}:{secs:02d}.{fraction:02d}"
 
-    with open(path, "w", encoding="utf-8") as file:
+    with open(path, "w", encoding="utf-8-sig") as file:
+        file.write(
+            "[Script Info]\n"
+            "Title: Divya Kahaniyan Hindi Captions\n"
+            "ScriptType: v4.00+\n"
+            "WrapStyle: 2\n"
+            "ScaledBorderAndShadow: yes\n"
+            "PlayResX: 720\n"
+            "PlayResY: 1280\n\n"
+            "[V4+ Styles]\n"
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+            "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+            "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+            "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+            "Style: Hindi,Noto Sans Devanagari,34,&H00FFFFFF,&H000000FF,"
+            "&HCC09091A,&H80000000,1,0,0,0,100,100,0,0,1,3,1,2,48,48,118,1\n\n"
+            "[Events]\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, "
+            "MarginV, Effect, Text\n"
+        )
+
         for number, (segment, weight) in enumerate(zip(segments, weights), start=1):
-            start = cursor
-            end = duration if number == len(segments) else cursor + duration * weight / total
-            cursor = end
-            # SRT line breaks are placed at natural word boundaries.
+            start_time = cursor
+            end_time = duration if number == len(segments) else cursor + duration * weight / total
+            cursor = end_time
             words = segment.split()
             lines, line = [], ""
             for word in words:
-                if len(line) + len(word) + 1 > 34:
+                if len(line) + len(word) + 1 > 32 and line:
                     lines.append(line)
                     line = word
                 else:
@@ -169,8 +189,7 @@ def _write_subtitles(narration, duration, path):
             if line:
                 lines.append(line)
             subtitle = r"\N".join(lines[:2])
-            file.write(f"{number}\n{stamp(start)} --> {stamp(end)}\n{subtitle}\n\n")
-
+            file.write(f"Dialogue: 0,{stamp(start_time)},{stamp(end_time)},Hindi,,0,0,0,,{subtitle}\n")
 
 def _probe_duration(audio_path):
     result = subprocess.run(
@@ -207,7 +226,7 @@ def generate_video(narration, audio_file, output=OUTPUT):
         _make_scene(index, title).save(scene_path, quality=92)
         scene_paths.append(scene_path)
 
-    subtitle_path = work_dir / "captions.srt"
+    subtitle_path = work_dir / "captions.ass"
     _write_subtitles(narration, duration, subtitle_path)
 
     # Each still is gently animated with a slow zoom. Scene durations are
@@ -228,10 +247,7 @@ def generate_video(narration, audio_file, output=OUTPUT):
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scene_paths)))
     filter_parts.append(f"{concat_inputs}concat=n={len(scene_paths)}:v=1:a=0,")
     subtitle_filter = (
-        f"subtitles={subtitle_path.as_posix()}:"
-        "force_style='FontName=Noto Sans Devanagari,FontSize=24,"
-        "PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,"
-        "BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=115'"
+        f"subtitles={subtitle_path.as_posix()}:fontsdir=/usr/share/fonts/truetype/noto"
     )
     filter_parts[-1] += subtitle_filter + "[vout]"
     filter_complex = ";".join(filter_parts)
