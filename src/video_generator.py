@@ -273,7 +273,8 @@ def _write_subtitles(narration, duration, path):
                     line = (line + " " + word).strip()
             if line:
                 lines.append(line)
-            subtitle = r"\N".join(lines[:2])
+            # Keep every word; never truncate a third wrapped line.
+            subtitle = r"\N".join(lines)
             file.write(f"Dialogue: 0,{stamp(start_time)},{stamp(end_time)},Hindi,,0,0,0,,{subtitle}\n")
 
 def _probe_duration(audio_path):
