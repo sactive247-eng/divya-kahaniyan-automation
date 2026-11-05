@@ -73,6 +73,15 @@ RULES:
 7. Include a short devotional thought.
 8. Avoid unsupported festival claims.
 9. Keep tone respectful and warm.
+10. Proofread the complete Hindi narration before returning it. Check Devanagari matras,
+    spelling, gender agreement, sentence flow and natural spoken Hindi.
+11. Prefer natural spoken phrases such as "द्वादशी तिथि शुरू होगी" instead of
+    awkward compounds such as "द्वादशी तिथिारंभ होगी".
+12. Keep every date, Panchang name and time exactly as supplied. Do not change,
+    infer, round or omit a verified time during proofreading.
+13. Read the narration once as if speaking it aloud; remove typographical errors
+    and unnatural constructions without changing the facts.
+14. Output narration in clean Devanagari. Avoid unnecessary English words.
 
 Return ONLY valid JSON:
 {{
@@ -109,6 +118,13 @@ def _parse_script(response_text, provider):
     if not isinstance(result.get("caption"), str):
         raise ValueError(f"{provider} returned an invalid caption.")
 
+    # Normalize Unicode and whitespace before this exact text is sent to both
+    # Edge TTS and the subtitle renderer.
+    import unicodedata
+    result["narration"] = unicodedata.normalize("NFC", result["narration"])
+    result["narration"] = re.sub(r"\\s+", " ", result["narration"]).strip()
+    if len(result["narration"]) < 120:
+        raise ValueError(f"{provider} narration is unexpectedly short; refusing low-quality output.")
     return result
 
 
