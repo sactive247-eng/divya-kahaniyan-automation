@@ -195,30 +195,31 @@ def _make_scene(index, title, theme):
 
 
 def _split_narration(text):
-    # Sentence-sized captions; punctuation is retained for natural pauses.
+    # Keep caption cards short enough for two readable lines on a phone.
+    # Punctuation is retained so captions follow the narration's natural pauses.
     pieces = []
     current = ""
     for sentence in text.replace("।", "।|").split("|"):
         sentence = sentence.strip()
         if not sentence:
             continue
-        if len(current) + len(sentence) <= 64:
+        if len(current) + len(sentence) + (1 if current else 0) <= 48:
             current = (current + " " + sentence).strip()
-        else:
-            if current:
+            continue
+
+        if current:
+            pieces.append(current)
+            current = ""
+
+        words = sentence.split()
+        for word in words:
+            candidate = (current + " " + word).strip()
+            if len(candidate) > 46 and current:
                 pieces.append(current)
-            if len(sentence) <= 64:
-                current = sentence
+                current = word
             else:
-                words = sentence.split()
-                current = ""
-                for word in words:
-                    if len(current) + len(word) + 1 > 58:
-                        if current:
-                            pieces.append(current)
-                        current = word
-                    else:
-                        current = (current + " " + word).strip()
+                current = candidate
+
     if current:
         pieces.append(current)
     return pieces or [text.strip()]
@@ -252,8 +253,8 @@ def _write_subtitles(narration, duration, path):
             "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
             "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
             "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-            "Style: Hindi,Noto Sans Devanagari,31,&H00FFFFFF,&H000000FF,"
-            "&HCC09091A,&H80000000,1,0,0,0,100,100,0,0,1,3,1,2,48,48,118,1\n\n"
+            "Style: Hindi,Noto Sans Devanagari,39,&H00FFFFFF,&H000000FF,"
+            "&HCC09091A,&H90000000,1,0,0,0,100,100,0,0,1,4,2,2,56,56,160,1\n\n"
             "[Events]\n"
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, "
             "MarginV, Effect, Text\n"
@@ -266,14 +267,16 @@ def _write_subtitles(narration, duration, path):
             words = segment.split()
             lines, line = [], ""
             for word in words:
-                if len(line) + len(word) + 1 > 32 and line:
+                if len(line) + len(word) + 1 > 24 and line:
                     lines.append(line)
                     line = word
                 else:
                     line = (line + " " + word).strip()
             if line:
                 lines.append(line)
-            # Keep every word; never truncate a third wrapped line.
+            # Preserve every word and flag unusually tall captions for review.
+            if len(lines) > 2:
+                print(f"WARNING: subtitle segment {number} uses {len(lines)} lines; check readability.")
             subtitle = r"\N".join(lines)
             file.write(f"Dialogue: 0,{stamp(start_time)},{stamp(end_time)},Hindi,,0,0,0,,{subtitle}\n")
 
