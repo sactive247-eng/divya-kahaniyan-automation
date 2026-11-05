@@ -27,9 +27,26 @@ def _get_status_code(error):
     response = getattr(error, "response", None)
     value = getattr(response, "status_code", None)
     try:
-        return int(value) if value is not None else None
+        if value is not None:
+            return int(value)
     except (TypeError, ValueError):
-        return None
+        pass
+
+    # google-genai versions differ in how APIError exposes the HTTP status.
+    # Fall back to the rendered exception text, e.g. "503 UNAVAILABLE".
+    message = str(error)
+    match = re.search(r"\\b(408|429|500|502|503|504)\\b", message)
+    if match:
+        return int(match.group(1))
+
+    # Some SDK exceptions keep the response details in args rather than
+    # exposing a numeric .code or .status_code attribute.
+    for argument in getattr(error, "args", ()):
+        match = re.search(r"\\b(408|429|500|502|503|504)\\b", str(argument))
+        if match:
+            return int(match.group(1))
+
+    return None
 
 
 def _build_prompt(panchang):
