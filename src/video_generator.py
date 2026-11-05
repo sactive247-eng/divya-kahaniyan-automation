@@ -168,8 +168,8 @@ def _write_subtitles(narration, duration, path):
                     line = (line + " " + word).strip()
             if line:
                 lines.append(line)
-            subtitle = "\\N".join(lines[:2])
-            file.write(f"{number}\\n{stamp(start)} --> {stamp(end)}\\n{subtitle}\\n\\n")
+            subtitle = r"\N".join(lines[:2])
+            file.write(f"{number}\n{stamp(start)} --> {stamp(end)}\n{subtitle}\n\n")
 
 
 def _probe_duration(audio_path):
@@ -215,14 +215,14 @@ def generate_video(narration, audio_file, output=OUTPUT):
     scene_duration = duration / len(scene_paths)
     inputs = []
     for scene_path in scene_paths:
-        inputs.extend(["-loop", "1", "-t", f"{scene_duration:.3f}", "-i", str(scene_path)])
+        inputs.extend(["-framerate", str(FPS), "-loop", "1", "-t", f"{scene_duration:.3f}", "-i", str(scene_path)])
 
     filter_parts = []
     for index in range(len(scene_paths)):
         filter_parts.append(
             f"[{index}:v]scale=800:1422,zoompan=z='min(zoom+0.00035,1.08)':"
             f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-            f"d={max(1, math.ceil(scene_duration * FPS))}:s={WIDTH}x{HEIGHT}:fps={FPS},"
+            f"d=1:s={WIDTH}x{HEIGHT}:fps={FPS},"
             f"setsar=1[v{index}]"
         )
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scene_paths)))
