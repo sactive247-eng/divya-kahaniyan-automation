@@ -113,7 +113,9 @@ def _library_background(theme_key, scene_index, date_key):
     root = Path("assets") / "backgrounds"
     extensions = {".jpg", ".jpeg", ".png", ".webp"}
     candidates = []
-    for folder in (theme_key, "general"):
+    folder_aliases = {"vishnu": "krishna", "moon": "purnima"}
+    primary_folder = folder_aliases.get(theme_key, theme_key)
+    for folder in (primary_folder, "general"):
         directory = root / folder
         if directory.exists():
             candidates = sorted(
@@ -351,7 +353,8 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT):
     print(f"Selected devotional visual theme: {theme_key} ({theme['label']})")
     scene_titles[0] = theme["label"]
     scene_paths = []
-    date_key = str((panchang or {}).get("day", {}).get("date", ""))
+    panchang_day = (panchang or {}).get("day", {})
+    date_key = str(panchang_day.get("date", "")) if isinstance(panchang_day, dict) else ""
     for index, title in enumerate(scene_titles):
         scene_path = work_dir / f"scene_{index}.jpg"
         artwork = _library_background(theme_key, index, date_key)
