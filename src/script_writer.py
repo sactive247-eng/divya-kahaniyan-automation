@@ -1,45 +1,49 @@
-
-import os
 import json
+import os
+import random
 import re
 import time
 
 from google import genai
 
-PRIMARY_MODEL = os.getenv(
-    "GEMINI_MODEL", "gemini-3.8-flash"
-)
 
-BACKUP_MODEL = os.getenv(
-    "GEMINI_BACKUP_MODEL", "gemini-3.5-flash-lite"
-)
+PRIMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+BACKUP_MODEL = os.getenv("GEMINI_BACKUP_MODEL", "gemini-3.5-flash-lite")
+
+RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+MAX_ATTEMPTS_PER_MODEL = 3
 
 
-def generate_script(panchang):
+def _get_status_code(error):
+    """Read the HTTP status from different google-genai exception versions."""
+    for attribute in ("code", "status_code"):
+        value = getattr(error, attribute, None)
+        try:
+            if value is not None:
+                return int(value)
+        except (TypeError, ValueError):
+            pass
 
-    api_key = os.environ["GEMINI_API_KEY"]
-    client = genai.Client(api_key=api_key)
+    response = getattr(error, "response", None)
+    value = getattr(response, "status_code", None)
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
-    prompt = f"""
-You are the Hindi devotional content writer
-for Divya Kahaniyan.
+
+def _build_prompt(panchang):
+    return f"""
+You are the Hindi devotional content writer for Divya Kahaniyan.
 
 Use ONLY this verified Panchang data:
 {json.dumps(panchang, ensure_ascii=False)}
 
-Create a natural Hindi Panchang narration
-of approximately 60–75 seconds.
-
-Do not sacrifice important Panchang details
-to meet the duration.
-
-Include complete start and end timings
-for Rahu Kaal, Tithi, Nakshatra, Yoga
-and Karana wherever available.
-
-If a timing is unavailable in the source,
-omit it and flag it for review.
-
+Create a natural Hindi Panchang narration of approximately 60–75 seconds.
+Do not sacrifice important Panchang details to meet the duration.
+Include complete start and end timings for Rahu Kaal, Tithi, Nakshatra,
+Yoga and Karana wherever available.
+If a timing is unavailable in the source, omit it and flag it for review.
 Never invent or calculate timings.
 
 RULES:
@@ -54,7 +58,6 @@ RULES:
 9. Keep tone respectful and warm.
 
 Return ONLY valid JSON:
-
 {{
   "title": "आज का पंचांग",
   "voice": "female or male",
@@ -67,72 +70,95 @@ VOICE SELECTION:
 - Major festival or vrat narration: male.
 """
 
-    models = [PRIMARY_MODEL, BACKUP_MODEL]
 
-    retryable_codes = [429, 500, 502, 503, 504]
+def _parse_script(response):
+    response_text = getattr(response, "text", None)
+    if not response_text:
+        raise ValueError("Gemini returned an empty response.")
+
+    cleaned = response_text.strip()
+    cleaned = re.sub(r"^\x60{3}(?:json)?\s*|\s*\x60{3}$", "", cleaned).strip()
+
+    try:
+        result = json.loads(cleaned)
+    except json.JSONDecodeError as error:
+        raise ValueError("Gemini response was not valid JSON.") from error
+
+    if result.get("voice") not in {"female", "male"}:
+        raise ValueError("Gemini returned an invalid voice selection.")
+    if not isinstance(result.get("narration"), str) or not result["narration"].strip():
+        raise ValueError("Gemini returned an empty narration.")
+    if not isinstance(result.get("caption"), str):
+        raise ValueError("Gemini returned an invalid caption.")
+
+    return result
+
+
+def generate_script(panchang):
+    api_key = os.environ["GEMINI_API_KEY"]
+    client = genai.Client(api_key=api_key)
+    prompt = _build_prompt(panchang)
+
+    models = list(dict.fromkeys([PRIMARY_MODEL, BACKUP_MODEL]))
+    last_error = None
 
     for model in models:
-
-        for attempt in range(3):
-
+        for attempt in range(1, MAX_ATTEMPTS_PER_MODEL + 1):
             try:
                 print(
-                    f"Trying {model}, attempt {attempt + 1}"
+                    f"Gemini: trying model '{model}' "
+                    f"(attempt {attempt}/{MAX_ATTEMPTS_PER_MODEL})"
                 )
 
                 response = client.models.generate_content(
                     model=model,
-                    contents=prompt
+                    contents=prompt,
                 )
+                result = _parse_script(response)
 
-                if not response.text:
-                    raise ValueError("Empty Gemini response")
-
-                text = response.text.strip()
-
-                text = re.sub(
-                    r"^```(?:json)?\s*|\s*```$",
-                    "",
-                    text
-                ).strip()
-
-                result = json.loads(text)
-
-                if result.get("voice") not in [
-                    "female", "male"
-                ]:
-                    raise ValueError("Invalid voice selection")
-
-                if not result.get("narration"):
-                    raise ValueError("Empty narration")
-
-                print(f"Script generated using {model}")
-
+                print(f"Gemini script generated successfully with '{model}'.")
                 return result
 
             except Exception as error:
+                last_error = error
+                status = _get_status_code(error)
 
-                status = getattr(error, "code", None)
-
-                if status not in retryable_codes:
-                    raise
-
-                if attempt < 2:
-                    wait = 2 ** (attempt + 1)
+                if status in RETRYABLE_STATUS_CODES:
+                    if attempt < MAX_ATTEMPTS_PER_MODEL:
+                        # Exponential backoff plus a small random delay.
+                        wait_seconds = (5 * (2 ** (attempt - 1))) + random.uniform(0, 3)
+                        print(
+                            f"Temporary Gemini HTTP {status} from '{model}'. "
+                            f"Retrying in {wait_seconds:.1f} seconds. "
+                            f"Details: {error}"
+                        )
+                        time.sleep(wait_seconds)
+                        continue
 
                     print(
-                        f"Temporary Gemini error: {error}"
+                        f"Model '{model}' still unavailable after "
+                        f"{MAX_ATTEMPTS_PER_MODEL} attempts; switching to backup."
                     )
-                    print(f"Retrying in {wait} seconds")
+                    break
 
-                    time.sleep(wait)
-
-                else:
+                # A 404 may mean this particular model is unavailable to the
+                # account, so try the configured backup. Authentication,
+                # permission and other non-transient errors should fail clearly.
+                if status == 404:
                     print(
-                        f"{model} unavailable after retries"
+                        f"Model '{model}' returned HTTP 404; "
+                        "trying the next configured model."
                     )
+                    break
+
+                raise RuntimeError(
+                    f"Gemini request failed for model '{model}'"
+                    + (f" (HTTP {status})" if status is not None else "")
+                    + f": {error}"
+                ) from error
 
     raise RuntimeError(
-        "Both Gemini models failed. "
-        "Please retry the workflow later."
-    )
+        "Gemini script generation failed with all configured models. "
+        "The Panchang fetch may have succeeded, but no narration was created. "
+        f"Last error: {last_error}"
+    ) from last_error
