@@ -37,6 +37,16 @@ def get_panchang():
         raise ValueError("Panchang date mismatch")
 
     day = data.get("day", {})
+    # Calendar weekday is deterministic from the ISO date; do not let an
+    # upstream label or language model misstate Friday/Saturday.
+    weekday_en = today.strftime("%A")
+    weekday_hi = {
+        "Monday": "सोमवार", "Tuesday": "मंगलवार", "Wednesday": "बुधवार",
+        "Thursday": "गुरुवार", "Friday": "शुक्रवार", "Saturday": "शनिवार",
+        "Sunday": "रविवार",
+    }[weekday_en]
+    day["weekday"] = weekday_en
+    day["weekday_hi"] = weekday_hi
     _log_timing_fields(data)
 
     required = [
