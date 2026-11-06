@@ -108,28 +108,41 @@ def _select_visual_theme(panchang):
     return key, VISUAL_THEMES[key]
 
 
-def _library_background(theme_key, scene_index, date_key):
-    """Pick a stable, rotating, text-free image from the local artwork library."""
-    # main.py runs from src/ in GitHub Actions; resolve assets from the repository root.
+def _library_backgrounds(theme_key, date_key, limit=5):
+    """Build a varied, deterministic scene list from relevant local artwork."""
     repository_root = Path(__file__).resolve().parents[1]
     root = repository_root / "assets" / "backgrounds"
     extensions = {".jpg", ".jpeg", ".png", ".webp"}
-    candidates = []
     folder_aliases = {"vishnu": "krishna", "moon": "purnima"}
     primary_folder = folder_aliases.get(theme_key, theme_key)
-    for folder in (primary_folder, "general"):
+    folders = [primary_folder, "festival", "general"]
+    candidates = []
+    seen = set()
+    for folder in folders:
         directory = root / folder
-        if directory.exists():
-            candidates = sorted(
-                path for path in directory.iterdir()
-                if path.is_file() and path.suffix.lower() in extensions
-            )
-        if candidates:
-            break
+        if not directory.exists():
+            continue
+        for path in sorted(directory.iterdir()):
+            if path.is_file() and path.suffix.lower() in extensions:
+                resolved = str(path.resolve())
+                if resolved not in seen:
+                    seen.add(resolved)
+                    candidates.append(path)
+
     if not candidates:
-        return None
-    seed = hashlib.sha256(f"{date_key}:{theme_key}:{scene_index}".encode("utf-8")).digest()
-    return candidates[int.from_bytes(seed[:4], "big") % len(candidates)]
+        return [None] * limit
+
+    seed = hashlib.sha256(f"{date_key}:{theme_key}".encode("utf-8")).digest()
+    randomizer = random.Random(int.from_bytes(seed[:8], "big"))
+    randomizer.shuffle(candidates)
+
+    # Prefer a relevant image first, then rotate through distinct artwork.
+    preferred = root / primary_folder
+    candidates.sort(key=lambda path: 0 if path.parent == preferred else 1)
+    selected = candidates[:limit]
+    while len(selected) < limit:
+        selected.append(candidates[len(selected) % len(candidates)])
+    return selected
 
 
 def _cover_image(path):
@@ -357,13 +370,13 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT, subtitle
     scene_paths = []
     panchang_day = (panchang or {}).get("day", {})
     date_key = str(panchang_day.get("date", "")) if isinstance(panchang_day, dict) else ""
-    for index, title in enumerate(scene_titles):
+    artwork_choices = _library_backgrounds(theme_key, date_key, len(scene_titles))
+    for index, (title, artwork) in enumerate(zip(scene_titles, artwork_choices)):
         scene_path = work_dir / f"scene_{index}.jpg"
-        artwork = _library_background(theme_key, index, date_key)
         if artwork:
             print(f"Scene {index + 1}: artwork library -> {artwork}")
         else:
-            print(f"Scene {index + 1}: procedural fallback (no {theme_key}/general artwork installed)")
+            print(f"Scene {index + 1}: procedural fallback (no artwork installed)")
         _make_scene(index, title, theme, background_path=artwork).save(scene_path, quality=92)
         scene_paths.append(scene_path)
 
