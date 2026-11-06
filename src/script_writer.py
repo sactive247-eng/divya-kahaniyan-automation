@@ -86,6 +86,16 @@ def _narration_ready(value):
         return [_narration_ready(item) for item in value]
     return _format_clock(value)
 
+def _normalize_next_day_times(text):
+    """Correct 24:00–47:59 clock values reintroduced by the language model."""
+    if not isinstance(text, str):
+        return text
+    return re.sub(
+        r"(?<!\d)(2[4-9]|[3-4]\d):([0-5]\d)(?!\d)",
+        lambda match: _format_clock(f"{match.group(1)}:{match.group(2)}"),
+        text,
+    )
+
 def _build_prompt(panchang):
     panchang = _narration_ready(panchang)
     return f"""
@@ -168,6 +178,8 @@ def _parse_script(response_text, provider):
     import unicodedata
     result["narration"] = unicodedata.normalize("NFC", result["narration"])
     result["narration"] = re.sub(r"\s+", " ", result["narration"]).strip()
+    result["narration"] = _normalize_next_day_times(result["narration"])
+    result["caption"] = _normalize_next_day_times(result["caption"])
     if len(result["narration"]) < 120:
         raise ValueError(f"{provider} narration is unexpectedly short; refusing low-quality output.")
     return result
