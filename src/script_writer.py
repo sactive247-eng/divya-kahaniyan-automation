@@ -87,11 +87,24 @@ def _narration_ready(value):
     return _format_clock(value)
 
 def _normalize_next_day_times(text):
-    """Correct 24:00–47:59 clock values reintroduced by the language model."""
+    """Correct next-day times whether the model writes digits or Hindi speech."""
     if not isinstance(text, str):
         return text
+
+    # Spoken Hindi form, e.g. "रात 29 बजकर 41 मिनट".
+    text = re.sub(
+        r"(?:(?:अगले दिन)\\s*)?(?:रात|सुबह|दोपहर|शाम)?\\s*"
+        r"(2[4-9]|[3-4]\\d)\\s*बजकर\\s*([0-5]\\d)\\s*मिनट",
+        lambda match: (
+            f"अगले दिन {('रात' if int(match.group(1)) - 24 == 0 else 'सुबह' if int(match.group(1)) - 24 < 12 else 'दोपहर' if int(match.group(1)) - 24 < 16 else 'शाम')} "
+            f"{(int(match.group(1)) - 24) % 12 or 12} बजकर {match.group(2)} मिनट"
+        ),
+        text,
+    )
+
+    # Numeric clock form, e.g. "29:41".
     return re.sub(
-        r"(?<!\d)(2[4-9]|[3-4]\d):([0-5]\d)(?!\d)",
+        r"(?<!\\d)(2[4-9]|[3-4]\\d):([0-5]\\d)(?!\\d)",
         lambda match: _format_clock(f"{match.group(1)}:{match.group(2)}"),
         text,
     )
