@@ -1,5 +1,6 @@
 
 import requests
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -74,6 +75,8 @@ TIMING_KEY_TERMS = (
 def _is_source_timing_key(key):
     key = str(key).lower()
     # Avoid classifying names/numbers as times; require a time-like field name.
+    if key.endswith("_name") or key.endswith("_number") or key.endswith("_id"):
+        return False
     return any(term in key for term in TIMING_KEY_TERMS)
 
 
@@ -85,7 +88,7 @@ def _source_time_display(value):
         return f"{hour:02d}:{minute:02d}"
     if isinstance(value, str):
         text = value.strip()
-        if text:
+        if re.fullmatch(r"\d{1,2}:\d{2}", text) or re.search(r"\b\d{1,2}:\d{2}\b", text):
             return text
     return None
 
