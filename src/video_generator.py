@@ -79,25 +79,34 @@ def _select_visual_theme(panchang):
     """Select a theme only from explicit festival and tithi data; never infer from weekday."""
     root = panchang if isinstance(panchang, dict) else {}
     day = root.get("day", {}) if isinstance(root.get("day", {}), dict) else {}
-    festival_values = day.get("festivals") or root.get("festivals") or []
+    festival_values = (
+        root.get("verified_festivals")
+        or day.get("festivals")
+        or root.get("festivals")
+        or []
+    )
     if isinstance(festival_values, str):
         festival_values = [festival_values]
-    festival_text = " ".join(str(item) for item in festival_values).lower()
+    festival_names = [
+        str(item.get("name", "")) if isinstance(item, dict) else str(item)
+        for item in festival_values
+    ]
+    festival_text = " ".join(festival_names).lower()
     tithi = str(day.get("tithi_name", "")).lower()
 
-    if any(word in festival_text for word in ("ganesh", "ganesha", "vinayak", "sankashti")):
+    if any(word in festival_text for word in ("ganesh", "ganesha", "vinayak", "sankashti", "गणेश", "विनायक")):
         key = "ganesha"
-    elif any(word in festival_text for word in ("surya", "ratha saptami", "makar sankranti", "chhath")):
+    elif any(word in festival_text for word in ("surya", "ratha saptami", "makar sankranti", "chhath", "सूर्य", "छठ", "मकर संक्रांति")):
         key = "surya"
-    elif any(word in festival_text for word in ("ekadashi", "vaikuntha", "prabodhini", "devutthana")):
+    elif any(word in festival_text for word in ("ekadashi", "vaikuntha", "prabodhini", "devutthana", "एकादशी", "वैकुंठ")):
         key = "vishnu"
-    elif any(word in festival_text for word in ("shiv", "pradosh", "somvati", "mahashivratri")):
+    elif any(word in festival_text for word in ("shiv", "pradosh", "somvati", "mahashivratri", "shivratri", "शिव", "प्रदोष")):
         key = "shiva"
-    elif any(word in festival_text for word in ("hanuman", "bajarang", "sankatmochan")):
+    elif any(word in festival_text for word in ("hanuman", "bajarang", "sankatmochan", "हनुमान", "बजरंग")):
         key = "hanuman"
-    elif any(word in festival_text for word in ("lakshmi", "deepavali", "diwali", "dhanteras")):
+    elif any(word in festival_text for word in ("lakshmi", "deepavali", "diwali", "dhanteras", "लक्ष्मी", "दीपावली", "धनतेरस")):
         key = "lakshmi"
-    elif any(word in festival_text for word in ("purnima", "pournami", "full moon")):
+    elif any(word in festival_text for word in ("purnima", "pournami", "full moon", "पूर्णिमा")):
         key = "moon"
     elif "ekadashi" in tithi:
         key = "vishnu"
@@ -105,17 +114,27 @@ def _select_visual_theme(panchang):
         key = "moon"
     else:
         key = "general"
-    return key, VISUAL_THEMES[key]
+    # Additional explicit observances can contribute secondary artwork scenes.
+    secondary = []
+    if any(word in festival_text for word in ("hanuman", "bajarang", "sankatmochan", "हनुमान", "बजरंग")):
+        secondary.append("hanuman")
+    if any(word in festival_text for word in ("shiv", "pradosh", "somvati", "mahashivratri", "shivratri", "शिव", "प्रदोष")):
+        secondary.append("shiva")
+    return key, VISUAL_THEMES[key], list(dict.fromkeys(x for x in secondary if x != key))
 
 
-def _library_backgrounds(theme_key, date_key, limit=5):
+def _library_backgrounds(theme_key, date_key, limit=5, extra_themes=None):
     """Build a varied, deterministic scene list from relevant local artwork."""
     repository_root = Path(__file__).resolve().parents[1]
     root = repository_root / "assets" / "backgrounds"
     extensions = {".jpg", ".jpeg", ".png", ".webp"}
     folder_aliases = {"vishnu": "krishna", "moon": "purnima"}
     primary_folder = folder_aliases.get(theme_key, theme_key)
-    folders = [primary_folder, "festival", "general"]
+    extra_folders = [
+        folder_aliases.get(theme, theme)
+        for theme in (extra_themes or [])
+    ]
+    folders = list(dict.fromkeys([primary_folder, *extra_folders, "festival", "general"]))
     candidates = []
     seen = set()
     for folder in folders:
@@ -364,13 +383,15 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT, subtitle
         "राहुकाल और शुभ विचार",
         "आज का भक्तिमय संदेश",
     ]
-    theme_key, theme = _select_visual_theme(panchang or {})
+    theme_key, theme, extra_themes = _select_visual_theme(panchang or {})
     print(f"Selected devotional visual theme: {theme_key} ({theme['label']})")
     scene_titles[0] = theme["label"]
     scene_paths = []
     panchang_day = (panchang or {}).get("day", {})
     date_key = str(panchang_day.get("date", "")) if isinstance(panchang_day, dict) else ""
-    artwork_choices = _library_backgrounds(theme_key, date_key, len(scene_titles))
+    artwork_choices = _library_backgrounds(
+        theme_key, date_key, len(scene_titles), extra_themes=extra_themes
+    )
     for index, (title, artwork) in enumerate(zip(scene_titles, artwork_choices)):
         scene_path = work_dir / f"scene_{index}.jpg"
         if artwork:
