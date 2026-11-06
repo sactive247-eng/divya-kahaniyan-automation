@@ -79,6 +79,8 @@ def main():
         "आज का पंचांग\n"
         f"Script provider: {provider}\n\n"
         + script["narration"]
+        + "\n\n📲 SOCIAL MEDIA CAPTION (Copy & Paste)\n"
+        + script.get("caption", "").strip()
         + "\n\nSource: shastrapanchangam.com"
     )
 
