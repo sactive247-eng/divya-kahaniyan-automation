@@ -79,11 +79,38 @@ def _format_clock(value):
     else: period, shown = "शाम", h - 12
     return f"अगले दिन {period} {shown}:{minute:02d} बजे"
 
-def _narration_ready(value):
+def _is_timing_key(key):
+    if not isinstance(key, str):
+        return False
+    key = key.lower()
+    return any(term in key for term in (
+        "sunrise", "sunset", "moonrise", "moonset",
+        "rahu", "yama", "gulika", "gulikai", "karana",
+        "tithi", "nakshatra", "yoga", "ends", "end_time",
+        "start_time", "rise", "set", "kalam",
+    ))
+
+
+def _format_source_minutes(value):
+    """Convert source API minute-of-day integers to HH:MM, retaining next-day hours."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return value
+    if value < 0 or value > 2879:
+        return value
+    hour, minute = divmod(value, 60)
+    return f"{hour:02d}:{minute:02d}"
+
+
+def _narration_ready(value, key=None):
     if isinstance(value, dict):
-        return {key: _narration_ready(item) for key, item in value.items()}
+        return {
+            child_key: _narration_ready(item, child_key)
+            for child_key, item in value.items()
+        }
     if isinstance(value, list):
-        return [_narration_ready(item) for item in value]
+        return [_narration_ready(item, key) for item in value]
+    if _is_timing_key(key) and isinstance(value, int) and not isinstance(value, bool):
+        value = _format_source_minutes(value)
     return _format_clock(value)
 
 def _normalize_next_day_times(text):
@@ -114,7 +141,8 @@ def _build_prompt(panchang):
     return f"""
 You are the Hindi devotional content writer for Divya Kahaniyan.
 
-Use ONLY this verified Panchang data. Times after midnight are preformatted in Hindi as the next day; never read raw 24+ hour clock values aloud:
+Use ONLY this verified Panchang data. The API stores timing values as minutes from midnight; timing fields have already been converted to clock values. Times after midnight are preformatted in Hindi as the next day.
+Treat every supplied timing as LOCKED SOURCE DATA. Copy its exact time and meaning. Never alter, recalculate, round, substitute or infer any timing. If a timing is supplied, it must remain exactly the same in the narration.
 {json.dumps(panchang, ensure_ascii=False)}
 
 Create a natural Hindi Panchang narration of approximately 60–75 seconds.
