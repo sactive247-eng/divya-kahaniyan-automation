@@ -6,6 +6,7 @@ import time
 
 import requests
 from google import genai
+from panchang import extract_source_timings
 
 
 PRIMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
@@ -193,7 +194,54 @@ VOICE SELECTION:
 """
 
 
-def _parse_script(response_text, provider):
+
+def _validate_source_timings(narration, source_timings):
+    import unicodedata
+    text = unicodedata.normalize("NFC", narration).lower()
+    missing = []
+    for item in source_timings:
+        value = item["display"]
+        match = re.fullmatch(r"(\\d{1,2}):(\\d{2})", value)
+        if match:
+            hour, minute = int(match.group(1)), int(match.group(2))
+            forms = [f"{hour}:{minute:02d}", f"{hour} बजकर {minute} मिनट", f"{hour} बजे {minute} मिनट"]
+            present = any(form in text for form in forms)
+        else:
+            present = value.lower() in text
+        if not present:
+            missing.append(item["path"] + "=" + value)
+    if missing:
+        raise ValueError("Narration rejected; missing source API timings: " + ", ".join(missing))
+
+
+def _build_social_caption(panchang):
+    from datetime import datetime
+    day = panchang.get("day", {})
+    date = str(day.get("date", "")).strip()
+    try:
+        date = datetime.strptime(date, "%Y-%m-%d").strftime("%d %B %Y")
+    except ValueError:
+        pass
+    weekday = str(day.get("weekday_hi", "")).strip()
+    details = [str(day.get(key, "")).strip() for key in ("tithi_name", "nakshatra_name", "yoga_name", "karana_name") if day.get(key)]
+    lines = [
+        "🙏 आज का पंचांग | " + date + ((" | " + weekday) if weekday else ""),
+        "📍 स्थान: दिल्ली",
+        "आज जानिए तिथि, नक्षत्र, योग, करण और दिन के महत्वपूर्ण पंचांग समय।",
+    ]
+    if details:
+        lines.append("🌸 आज के पंचांग विवरण: " + " | ".join(details))
+    lines += [
+        "🔱 ईश्वर का स्मरण करें और सकारात्मक विचारों के साथ दिन की शुरुआत करें।",
+        "आपका दिन मंगलमय हो!",
+        "",
+        "दिव्य कहानियाँ — भक्ति, ज्ञान और सनातन संस्कृति।",
+        "",
+        "#आजकापंचांग #DailyPanchang #हिंदूपंचांग #सनातनधर्म #दिव्यकहानियाँ #Bhakti #ShivBhakti #HindiReels #YouTubeShorts",
+    ]
+    return "\\n".join(lines)
+
+def _parse_script(response_text, provider, source_timings=None):
     if not isinstance(response_text, str) or not response_text.strip():
         raise ValueError(f"{provider} returned an empty response.")
 
@@ -223,6 +271,7 @@ def _parse_script(response_text, provider):
     result["caption"] = _normalize_next_day_times(result["caption"])
     if len(result["narration"]) < 120:
         raise ValueError(f"{provider} narration is unexpectedly short; refusing low-quality output.")
+    _validate_source_timings(result["narration"], source_timings or [])
     return result
 
 
@@ -268,7 +317,7 @@ def _generate_with_groq(prompt):
             response.raise_for_status()
             body = response.json()
             content = body["choices"][0]["message"]["content"]
-            result = _parse_script(content, "Groq")
+            result = _parse_script(content, "Groq", getattr(_generate_with_groq, "_source_timings", []))
             result["generated_by"] = f"Groq ({GROQ_MODEL})"
             print(f"Groq script generated successfully with '{GROQ_MODEL}'.")
             return result
@@ -302,7 +351,11 @@ def generate_script(panchang):
         raise RuntimeError("GEMINI_API_KEY is not configured in GitHub Secrets.")
 
     client = genai.Client(api_key=api_key)
-    prompt = _build_prompt(panchang)
+    source_timings = extract_source_timings(panchang)
+    prompt_data = dict(panchang)
+    prompt_data["_source_timings"] = [{"path": x["path"], "time": x["display"]} for x in source_timings]
+    prompt = _build_prompt(prompt_data)
+    _generate_with_groq._source_timings = source_timings
     models = list(dict.fromkeys([PRIMARY_MODEL, BACKUP_MODEL]))
     last_error = None
 
@@ -317,8 +370,9 @@ def generate_script(panchang):
                     model=model,
                     contents=prompt,
                 )
-                result = _parse_script(getattr(response, "text", None), "Gemini")
+                result = _parse_script(getattr(response, "text", None), "Gemini", source_timings)
                 result["generated_by"] = f"Gemini ({model})"
+                result["caption"] = _build_social_caption(panchang)
                 print(f"Gemini script generated successfully with '{model}'.")
                 return result
 
@@ -360,7 +414,9 @@ def generate_script(panchang):
         "Switching to independent Groq fallback."
     )
     try:
-        return _generate_with_groq(prompt)
+        result = _generate_with_groq(prompt)
+        result['caption'] = _build_social_caption(panchang)
+        return result
     except Exception as groq_error:
         raise RuntimeError(
             "Script generation failed with both Gemini models and the Groq fallback. "
