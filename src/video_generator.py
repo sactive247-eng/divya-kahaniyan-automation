@@ -385,7 +385,14 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT, subtitle
         )
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scene_paths)))
     filter_parts.append(f"{concat_inputs}concat=n={len(scene_paths)}:v=1:a=0,")
-    if subtitles:\n        subtitle_filter = (\n            f"subtitles={subtitle_path.as_posix()}:fontsdir=/usr/share/fonts/truetype/noto"\n        )\n        filter_parts[-1] += subtitle_filter + "[vout]"\n    else:\n        filter_parts[-1] += "null[vout]"\n    filter_complex = ";".join(filter_parts)
+    if subtitles:
+        subtitle_filter = (
+            f"subtitles={subtitle_path.as_posix()}:fontsdir=/usr/share/fonts/truetype/noto"
+        )
+        filter_parts[-1] += subtitle_filter + "[vout]"
+    else:
+        filter_parts[-1] += "null[vout]"
+    filter_complex = ";".join(filter_parts)
 
     command = [
         "ffmpeg", "-y", *inputs, "-i", str(audio_path),
