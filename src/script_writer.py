@@ -201,7 +201,7 @@ def _validate_source_timings(narration, source_timings):
     missing = []
     for item in source_timings:
         value = item["display"]
-        match = re.fullmatch(r"(\\d{1,2}):(\\d{2})", value)
+        match = re.fullmatch(r"(\d{1,2}):(\d{2})", value)
         if match:
             hour, minute = int(match.group(1)), int(match.group(2))
             forms = [f"{hour}:{minute:02d}", f"{hour} बजकर {minute} मिनट", f"{hour} बजे {minute} मिनट"]
@@ -239,7 +239,7 @@ def _build_social_caption(panchang):
         "",
         "#आजकापंचांग #DailyPanchang #हिंदूपंचांग #सनातनधर्म #दिव्यकहानियाँ #Bhakti #ShivBhakti #HindiReels #YouTubeShorts",
     ]
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 def _parse_script(response_text, provider, source_timings=None):
     if not isinstance(response_text, str) or not response_text.strip():
