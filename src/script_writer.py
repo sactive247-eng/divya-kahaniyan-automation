@@ -49,6 +49,30 @@ def _get_status_code(error):
     return None
 
 
+def _format_clock(value):
+    if not isinstance(value, str):
+        return value
+    match = re.fullmatch(r"(\d{1,2}):(\d{2})", value.strip())
+    if not match:
+        return value
+    hour, minute = int(match.group(1)), int(match.group(2))
+    if hour < 24 or hour > 47 or minute > 59:
+        return value
+    h = hour - 24
+    if h == 0: period, shown = "रात", 12
+    elif h < 5: period, shown = "रात", h
+    elif h < 12: period, shown = "सुबह", h
+    elif h < 16: period, shown = "दोपहर", h - 12
+    else: period, shown = "शाम", h - 12
+    return f"अगले दिन {period} {shown}:{minute:02d} बजे"
+
+def _narration_ready(value):
+    if isinstance(value, dict):
+        return {key: _narration_ready(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_narration_ready(item) for item in value]
+    return _format_clock(value)
+
 def _build_prompt(panchang):
     panchang = _narration_ready(panchang)
     return f"""
