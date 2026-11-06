@@ -42,8 +42,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GROQ_MODEL: openai/gpt-oss-120b
-          GEMINI_MODEL: gemini-3.8-flash
-          GEMINI_BACKUP_MODEL: gemini-3.5-flash-lite
+          GEMINI_MODEL: gemini-3.5-flash-lite
+          GEMINI_BACKUP_MODEL: gemini-3.8-flash
         run: |
           cd src
           python main.py
