@@ -18,6 +18,20 @@ GROQ_MAX_ATTEMPTS = 2
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
+def _is_transient_error(error):
+    """Detect temporary transport failures that have no HTTP status code."""
+    if _get_status_code(error) in RETRYABLE_STATUS_CODES:
+        return True
+    names = ("timeout", "connecterror", "connectionerror", "networkerror", "remoteprotocolerror", "transporterror")
+    current = error
+    for _ in range(4):
+        if current is None:
+            break
+        if any(token in type(current).__name__.lower() for token in names):
+            return True
+        current = current.__cause__ or current.__context__
+    message = str(error).lower()
+    return any(token in message for token in ("server disconnected", "connection reset", "connection aborted", "temporarily unavailable", "timed out"))
 def _get_status_code(error):
     """Read HTTP status from different SDK and requests exception versions."""
     for attribute in ("code", "status_code"):
@@ -259,11 +273,11 @@ def generate_script(panchang):
                 last_error = error
                 status = _get_status_code(error)
 
-                if status in RETRYABLE_STATUS_CODES:
+                if _is_transient_error(error):
                     if attempt < MAX_ATTEMPTS_PER_MODEL:
                         wait_seconds = (5 * (2 ** (attempt - 1))) + random.uniform(0, 3)
                         print(
-                            f"Temporary Gemini HTTP {status} from '{model}'. "
+                            f"Temporary Gemini transport/HTTP failure (status={status}) from '{model}'. "
                             f"Retrying in {wait_seconds:.1f} seconds. Details: {error}"
                         )
                         time.sleep(wait_seconds)
