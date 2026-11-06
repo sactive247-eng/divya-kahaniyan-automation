@@ -3,6 +3,7 @@ import json
 import requests
 
 from panchang import get_panchang
+from festivals import get_verified_festivals
 from script_writer import generate_script
 from voice_generator import generate_voice
 from video_generator import generate_video
@@ -47,6 +48,18 @@ def send_telegram(message, audio_file=None, video_file=None):
 def main():
     print("Fetching Delhi Panchang...")
     data = get_panchang()
+
+    panchang_date = data.get("day", {}).get("date")
+    print("Checking verified Delhi festival dates...")
+    try:
+        data["verified_festivals"] = get_verified_festivals(panchang_date, "delhi")
+        if data["verified_festivals"]:
+            print("Verified festivals: " + ", ".join(item["name"] for item in data["verified_festivals"]))
+        else:
+            print("No festival explicitly listed for Delhi on this date.")
+    except Exception as error:
+        data["verified_festivals"] = []
+        print(f"Festival lookup unavailable; continuing without festival claims: {error}")
 
     print("Generating Hindi script...")
     script = generate_script(data)
