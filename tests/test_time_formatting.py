@@ -9,14 +9,17 @@ from script_writer import _normalize_next_day_times
 
 
 class NextDayTimeFormattingTests(unittest.TestCase):
-    def test_normalizes_times_beyond_midnight(self):
-        text = "चंद्रमा 29:41 पर, नक्षत्र 29:53 तक और योग 27:28 तक रहेगा।"
-        expected = (
-            "चंद्रमा अगले दिन सुबह 5:41 बजे पर, "
-            "नक्षत्र अगले दिन सुबह 5:53 बजे तक और "
-            "योग अगले दिन सुबह 3:28 बजे तक रहेगा।"
+    def test_normalizes_numeric_next_day_time(self):
+        self.assertEqual(
+            _normalize_next_day_times("नक्षत्र 29:53 तक रहेगा।"),
+            "नक्षत्र अगले दिन सुबह 5:53 बजे तक रहेगा।",
         )
-        self.assertEqual(_normalize_next_day_times(text), expected)
+
+    def test_normalizes_spoken_hindi_next_day_time(self):
+        self.assertEqual(
+            _normalize_next_day_times("चंद्रमा रात 29 बजकर 41 मिनट पर उदय होगा।"),
+            "चंद्रमा अगले दिन सुबह 5 बजकर 41 मिनट पर उदय होगा।",
+        )
 
     def test_leaves_normal_times_unchanged(self):
         text = "सूर्योदय 06:37 और सूर्यास्त 17:32 पर होगा।"
