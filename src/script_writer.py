@@ -84,11 +84,13 @@ def _is_timing_key(key):
     if not isinstance(key, str):
         return False
     key = key.lower()
+    if key.endswith("_name") or key.endswith("_number") or key.endswith("_id"):
+        return False
     return any(term in key for term in (
         "sunrise", "sunset", "moonrise", "moonset",
-        "rahu", "yama", "gulika", "gulikai", "karana",
-        "tithi", "nakshatra", "yoga", "ends", "end_time",
-        "start_time", "rise", "set", "kalam",
+        "rahu", "yama", "gulika", "gulikai",
+        "ends", "end_time", "start_time", "starts_at", "ends_at",
+        "rise", "set", "kalam", "kaal", "time",
     ))
 
 
