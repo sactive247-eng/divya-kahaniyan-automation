@@ -30,7 +30,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate Python syntax
-        run: python -m compileall -q src
+        run: python -m compileall -q src tests
+
+      - name: Test calendar and festival theme rules
+        run: python -m unittest discover -s tests -v
 
       - name: Generate Panchang and voice
         env:
