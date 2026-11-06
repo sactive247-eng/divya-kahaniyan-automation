@@ -61,3 +61,62 @@ def get_panchang():
         raise ValueError(f"Missing Panchang fields: {missing}")
 
     return data
+
+
+TIMING_KEY_TERMS = (
+    "sunrise", "sunset", "moonrise", "moonset", "rahu", "yama",
+    "gulika", "gulikai", "karana", "tithi", "nakshatra", "yoga",
+    "start_time", "end_time", "starts_at", "ends_at", "start", "end",
+    "rise", "set", "kalam", "kaal", "time",
+)
+
+
+def _is_source_timing_key(key):
+    key = str(key).lower()
+    # Avoid classifying names/numbers as times; require a time-like field name.
+    return any(term in key for term in TIMING_KEY_TERMS)
+
+
+def _source_time_display(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and 0 <= value <= 2879:
+        hour, minute = divmod(value, 60)
+        return f"{hour:02d}:{minute:02d}"
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            return text
+    return None
+
+
+def extract_source_timings(payload):
+    """Extract every timing-valued field from the original API payload, without mutating it."""
+    found = []
+
+    def walk(value, path=""):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = f"{path}.{key}" if path else str(key)
+                if _is_source_timing_key(key):
+                    if isinstance(child, list):
+                        for index, item in enumerate(child):
+                            display = _source_time_display(item)
+                            if display is not None:
+                                found.append({"path": f"{child_path}[{index}]", "display": display, "raw": item})
+                    else:
+                        display = _source_time_display(child)
+                        if display is not None:
+                            found.append({"path": child_path, "display": display, "raw": child})
+                if isinstance(child, (dict, list)):
+                    walk(child, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                walk(child, f"{path}[{index}]")
+
+    walk(payload)
+    # Deduplicate the same source path if a nested timing structure was traversed.
+    unique = {}
+    for item in found:
+        unique[item["path"]] = item
+    return list(unique.values())
