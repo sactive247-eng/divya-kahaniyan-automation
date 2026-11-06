@@ -95,19 +95,20 @@ RULES:
 5. Mention Delhi as the location.
 6. Include date and weekday.
 7. Include a short devotional thought.
-8. Avoid unsupported festival claims.
-9. Keep tone respectful and warm.
-10. Proofread the complete Hindi narration before returning it. Check Devanagari matras,
+8. Use only entries in verified_festivals for festival names; if the list is empty, do not mention a festival.
+9. When verified_festivals contains entries, mention their exact names naturally and briefly. Do not infer puja methods, timings or significance not present in the data.
+10. Keep tone respectful and warm.
+11. Proofread the complete Hindi narration before returning it. Check Devanagari matras,
     spelling, gender agreement, sentence flow and natural spoken Hindi.
-11. Prefer natural spoken phrases such as "द्वादशी तिथि शुरू होगी" instead of
+12. Prefer natural spoken phrases such as "द्वादशी तिथि शुरू होगी" instead of
     awkward compounds such as "द्वादशी तिथिारंभ होगी".
-12. Preserve the supplied time meaning exactly. Times beginning with अगले दिन must be spoken as written; never say values such as 28:43 बजे. Do not calculate, round or omit a verified time.
-13. Do not invent festival names. Mention a festival only when an explicit verified festival field exists in the supplied data.
-14. Keep every date and Panchang name exactly as supplied. Do not change,
+13. Preserve the supplied time meaning exactly. Times beginning with अगले दिन must be spoken as written; never say values such as 28:43 बजे. Do not calculate, round or omit a verified time.
+14. Do not invent festival names. Mention a festival only when an explicit verified festival field exists in the supplied data.
+15. Keep every date and Panchang name exactly as supplied. Do not change,
     infer, round or omit a verified time during proofreading.
-13. Read the narration once as if speaking it aloud; remove typographical errors
+16. Read the narration once as if speaking it aloud; remove typographical errors
     and unnatural constructions without changing the facts.
-14. Output narration in clean Devanagari. Avoid unnecessary English words.
+17. Output narration in clean Devanagari. Avoid unnecessary English words.
 
 Return ONLY valid JSON:
 {{
