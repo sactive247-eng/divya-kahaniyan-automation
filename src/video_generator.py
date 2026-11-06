@@ -333,7 +333,7 @@ def _probe_duration(audio_path):
     return float(result.stdout.strip())
 
 
-def generate_video(narration, audio_file, panchang=None, output=OUTPUT):
+def generate_video(narration, audio_file, panchang=None, output=OUTPUT, subtitles=False):
     audio_path = Path(audio_file)
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
@@ -367,9 +367,7 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT):
         _make_scene(index, title, theme, background_path=artwork).save(scene_path, quality=92)
         scene_paths.append(scene_path)
 
-    subtitle_path = work_dir / "captions.ass"
-    _write_subtitles(narration, duration, subtitle_path)
-
+    # Devanagari matra placement can vary across FFmpeg/libass builds. Keep\n    # captions disabled by default until rendering is verified on the CI runner.\n    subtitle_path = work_dir / "captions.ass"\n    if subtitles:\n        _write_subtitles(narration, duration, subtitle_path)\n
     # Each still is gently animated with a slow zoom. Scene durations are
     # balanced across the actual voice duration; subtitles follow the narration.
     scene_duration = duration / len(scene_paths)
@@ -387,11 +385,7 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT):
         )
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scene_paths)))
     filter_parts.append(f"{concat_inputs}concat=n={len(scene_paths)}:v=1:a=0,")
-    subtitle_filter = (
-        f"subtitles={subtitle_path.as_posix()}:fontsdir=/usr/share/fonts/truetype/noto"
-    )
-    filter_parts[-1] += subtitle_filter + "[vout]"
-    filter_complex = ";".join(filter_parts)
+    if subtitles:\n        subtitle_filter = (\n            f"subtitles={subtitle_path.as_posix()}:fontsdir=/usr/share/fonts/truetype/noto"\n        )\n        filter_parts[-1] += subtitle_filter + "[vout]"\n    else:\n        filter_parts[-1] += "null[vout]"\n    filter_complex = ";".join(filter_parts)
 
     command = [
         "ffmpeg", "-y", *inputs, "-i", str(audio_path),
