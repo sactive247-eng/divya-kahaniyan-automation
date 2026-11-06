@@ -110,7 +110,9 @@ def _select_visual_theme(panchang):
 
 def _library_background(theme_key, scene_index, date_key):
     """Pick a stable, rotating, text-free image from the local artwork library."""
-    root = Path("assets") / "backgrounds"
+    # main.py runs from src/ in GitHub Actions; resolve assets from the repository root.
+    repository_root = Path(__file__).resolve().parents[1]
+    root = repository_root / "assets" / "backgrounds"
     extensions = {".jpg", ".jpeg", ".png", ".webp"}
     candidates = []
     folder_aliases = {"vishnu": "krishna", "moon": "purnima"}
