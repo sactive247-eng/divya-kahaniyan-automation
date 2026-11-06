@@ -50,10 +50,11 @@ def _get_status_code(error):
 
 
 def _build_prompt(panchang):
+    panchang = _narration_ready(panchang)
     return f"""
 You are the Hindi devotional content writer for Divya Kahaniyan.
 
-Use ONLY this verified Panchang data:
+Use ONLY this verified Panchang data. Times after midnight are preformatted in Hindi as the next day; never read raw 24+ hour clock values aloud:
 {json.dumps(panchang, ensure_ascii=False)}
 
 Create a natural Hindi Panchang narration of approximately 60–75 seconds.
@@ -77,7 +78,9 @@ RULES:
     spelling, gender agreement, sentence flow and natural spoken Hindi.
 11. Prefer natural spoken phrases such as "द्वादशी तिथि शुरू होगी" instead of
     awkward compounds such as "द्वादशी तिथिारंभ होगी".
-12. Keep every date, Panchang name and time exactly as supplied. Do not change,
+12. Preserve the supplied time meaning exactly. Times beginning with अगले दिन must be spoken as written; never say values such as 28:43 बजे. Do not calculate, round or omit a verified time.
+13. Do not invent festival names. Mention a festival only when an explicit verified festival field exists in the supplied data.
+14. Keep every date and Panchang name exactly as supplied. Do not change,
     infer, round or omit a verified time during proofreading.
 13. Read the narration once as if speaking it aloud; remove typographical errors
     and unnatural constructions without changing the facts.
