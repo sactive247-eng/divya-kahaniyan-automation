@@ -60,7 +60,6 @@ def _format_clock(value):
         return value
     h = hour - 24
     if h == 0: period, shown = "रात", 12
-    elif h < 5: period, shown = "रात", h
     elif h < 12: period, shown = "सुबह", h
     elif h < 16: period, shown = "दोपहर", h - 12
     else: period, shown = "शाम", h - 12
