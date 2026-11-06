@@ -81,6 +81,10 @@ Use ONLY this verified Panchang data. Times after midnight are preformatted in H
 {json.dumps(panchang, ensure_ascii=False)}
 
 Create a natural Hindi Panchang narration of approximately 60–75 seconds.
+The supplied day.weekday_hi is the authoritative Hindi weekday calculated from
+the ISO calendar date. Use it exactly; never infer the weekday yourself.
+The supplied day.date is authoritative. If the weekday field is missing, do
+not guess a weekday; flag it for review in the caption.
 Do not sacrifice important Panchang details to meet the duration.
 Include complete start and end timings for Rahu Kaal, Tithi, Nakshatra,
 Yoga and Karana wherever available.
@@ -95,8 +99,8 @@ RULES:
 5. Mention Delhi as the location.
 6. Include date and weekday.
 7. Include a short devotional thought.
-8. Use only entries in verified_festivals for festival names; if the list is empty, do not mention a festival.
-9. When verified_festivals contains entries, mention their exact names naturally and briefly. Do not infer puja methods, timings or significance not present in the data.
+8. Use only entries in verified_festivals for festival names; if the list is empty, do not mention a festival. These entries have been independently matched to the requested Delhi date.
+9. When verified_festivals contains entries, mention their exact names naturally and briefly. Do not infer puja methods, timings or significance not present in the data. Preserve the supplied names; do not substitute a different festival.
 10. Keep tone respectful and warm.
 11. Proofread the complete Hindi narration before returning it. Check Devanagari matras,
     spelling, gender agreement, sentence flow and natural spoken Hindi.
