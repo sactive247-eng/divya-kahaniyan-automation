@@ -2,9 +2,9 @@ import os
 import json
 import requests
 
-from panchang import get_panchang
+from panchang import get_panchang, extract_source_timings
 from festivals import get_verified_festivals
-from script_writer import generate_script
+from script_writer import generate_script, _validate_source_timings
 from voice_generator import generate_voice
 from video_generator import generate_video
 
@@ -64,6 +64,11 @@ def main():
     print("Generating Hindi script...")
     script = generate_script(data)
 
+    source_timings = extract_source_timings(data)
+    _validate_source_timings(script["narration"], source_timings)
+    if not script.get("caption", "").strip() or "#" not in script["caption"]:
+        raise ValueError("Social caption is incomplete or has no hashtags; refusing delivery.")
+
     with open("daily_script.json", "w", encoding="utf-8") as file:
         json.dump(script, file, ensure_ascii=False, indent=2)
 
@@ -71,7 +76,7 @@ def main():
     audio = generate_voice(script["narration"], script["voice"])
 
     print("Generating vertical Panchang video...")
-    video = generate_video(script["narration"], audio, panchang=data)
+    video = generate_video(script["narration"], audio, panchang=data, subtitles=True)
 
     provider = script.get("generated_by", "AI provider")
     message = (
