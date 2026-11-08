@@ -203,11 +203,15 @@ def _validate_source_timings(narration, source_timings):
     missing = []
     for item in source_timings:
         value = item["display"]
-        match = re.fullmatch(r"(\d{1,2}):(\d{2})", value)
+        next_day = value.startswith("NEXT_DAY ")
+        clock = value.removeprefix("NEXT_DAY ").strip()
+        match = re.fullmatch(r"(\d{1,2}):(\d{2})", clock)
         if match:
             hour, minute = int(match.group(1)), int(match.group(2))
             forms = [f"{hour}:{minute:02d}", f"{hour} बजकर {minute} मिनट", f"{hour} बजे {minute} मिनट"]
             present = any(form in text for form in forms)
+            if next_day:
+                present = present and ("अगले दिन" in text or "अगली सुबह" in text or "अगली रात" in text)
         else:
             present = value.lower() in text
         if not present:
