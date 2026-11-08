@@ -401,7 +401,10 @@ def generate_video(narration, audio_file, panchang=None, output=OUTPUT, subtitle
         _make_scene(index, title, theme, background_path=artwork).save(scene_path, quality=92)
         scene_paths.append(scene_path)
 
-    # Devanagari matra placement can vary across FFmpeg/libass builds. Keep\n    # captions disabled by default until rendering is verified on the CI runner.\n    subtitle_path = work_dir / "captions.ass"\n    if subtitles:\n        _write_subtitles(narration, duration, subtitle_path)\n
+    # Create subtitle file only when subtitles are requested.
+    subtitle_path = work_dir / "captions.ass"
+    if subtitles:
+        _write_subtitles(narration, duration, subtitle_path)
     # Each still is gently animated with a slow zoom. Scene durations are
     # balanced across the actual voice duration; subtitles follow the narration.
     scene_duration = duration / len(scene_paths)
