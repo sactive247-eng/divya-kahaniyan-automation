@@ -30,6 +30,16 @@ class SourceTimingValidationTests(unittest.TestCase):
         self.assertNotIn("day.tithi_name", values)
         self.assertEqual(source["day"]["tithi_ends"], 648)
 
+    def test_ignores_bare_tithi_nakshatra_yoga_karana_numbers(self):
+        source = {"day": {"tithi": 28, "nakshatra": 14, "yoga": 2, "karana": 7,
+                          "karana_name": "Shakuni"}}
+        self.assertEqual(extract_source_timings(source), [])
+
+    def test_converts_next_day_minutes_to_next_day_clock(self):
+        source = {"day": {"nakshatra_ends": 1884}}
+        timings = extract_source_timings(source)
+        self.assertEqual(timings[0]["display"], "NEXT_DAY 07:24")
+
     def test_rejects_missing_source_time(self):
         timings = [{"path": "day.sunrise", "display": "06:37"},
                    {"path": "day.sunset", "display": "17:32"}]
@@ -41,6 +51,14 @@ class SourceTimingValidationTests(unittest.TestCase):
                    {"path": "day.sunset", "display": "17:32"}]
         _validate_source_timings(
             "सूर्योदय 6 बजकर 37 मिनट और सूर्यास्त 17:32 पर होगा।", timings
+        )
+
+    def test_next_day_time_requires_next_day_marker(self):
+        timings = [{"path": "day.nakshatra_ends", "display": "NEXT_DAY 07:24"}]
+        with self.assertRaisesRegex(ValueError, "nakshatra_ends"):
+            _validate_source_timings("नक्षत्र सुबह 7 बजकर 24 मिनट पर समाप्त होगा।", timings)
+        _validate_source_timings(
+            "नक्षत्र अगले दिन सुबह 7 बजकर 24 मिनट पर समाप्त होगा।", timings
         )
 
     def test_caption_has_date_location_and_hashtags(self):
