@@ -77,19 +77,37 @@ def _is_source_timing_key(key):
     # Avoid classifying names/numbers as times; require a time-like field name.
     if key.endswith("_name") or key.endswith("_number") or key.endswith("_id"):
         return False
-    return any(term in key for term in TIMING_KEY_TERMS)
+    # Only explicit clock fields qualify. Bare tithi/nakshatra/yoga/karana
+    # integers are durations/indices in this API, not wall-clock times.
+    explicit = (
+        "sunrise", "sunset", "moonrise", "moonset",
+        "rahu", "yama", "gulika", "gulikai",
+        "start_time", "end_time", "starts_at", "ends_at",
+        "start_at", "end_at", "rise_time", "set_time",
+        "kalam", "kaal",
+    )
+    if any(term in key for term in explicit):
+        return True
+    return key.endswith(("_ends", "_end", "_starts", "_start", "_time"))
 
 
 def _source_time_display(value):
     if isinstance(value, bool):
         return None
     if isinstance(value, int) and 0 <= value <= 2879:
-        hour, minute = divmod(value, 60)
-        return f"{hour:02d}:{minute:02d}"
+        day_offset, minute_of_day = divmod(value, 1440)
+        hour, minute = divmod(minute_of_day, 60)
+        clock = f"{hour:02d}:{minute:02d}"
+        return f"NEXT_DAY {clock}" if day_offset else clock
     if isinstance(value, str):
         text = value.strip()
-        if re.fullmatch(r"\d{1,2}:\d{2}", text) or re.search(r"\b\d{1,2}:\d{2}\b", text):
-            return text
+        if re.fullmatch(r"\d{1,2}:\d{2}", text):
+            match = re.fullmatch(r"(\d{1,2}):(\d{2})", text)
+            hour, minute = int(match.group(1)), int(match.group(2))
+            if hour >= 24 and hour < 48 and minute < 60:
+                return f"NEXT_DAY {hour - 24:02d}:{minute:02d}"
+            if hour < 24 and minute < 60:
+                return text
     return None
 
 
