@@ -61,6 +61,22 @@ class SourceTimingValidationTests(unittest.TestCase):
             "नक्षत्र अगले दिन सुबह 7 बजकर 24 मिनट पर समाप्त होगा।", timings
         )
 
+    def test_accepts_next_day_midnight_as_twelve_at_night(self):
+        timings = [{"path": "day.moonset", "display": "NEXT_DAY 00:06"}]
+        _validate_source_timings(
+            "चंद्रास्त अगले दिन रात 12:06 बजे होगा।", timings
+        )
+        _validate_source_timings(
+            "चंद्रास्त अगले दिन रात 12 बजकर 6 मिनट पर होगा।", timings
+        )
+
+    def test_rejects_midnight_time_without_next_day_marker(self):
+        timings = [{"path": "day.moonset", "display": "NEXT_DAY 00:06"}]
+        with self.assertRaisesRegex(ValueError, "day.moonset"):
+            _validate_source_timings(
+                "चंद्रास्त रात 12:06 बजे होगा।", timings
+            )
+
     def test_caption_has_date_location_and_hashtags(self):
         caption = _build_social_caption({
             "day": {
