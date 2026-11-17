@@ -211,7 +211,20 @@ def _validate_source_timings(narration, source_timings):
             forms = [f"{hour}:{minute:02d}", f"{hour} बजकर {minute} मिनट", f"{hour} बजे {minute} मिनट"]
             present = any(form in text for form in forms)
             if next_day:
-                present = present and ("अगले दिन" in text or "अगली सुबह" in text or "अगली रात" in text)
+                # Midnight is spoken as 12:MM रात, although the source clock is
+                # 00:MM. Accept the exact normalized Hindi rendering as well
+                # as the 24-hour source representation.
+                next_day_clock = _format_clock(f"{hour + 24}:{minute:02d}")
+                next_day_forms = [next_day_clock]
+                if hour == 0:
+                    next_day_forms.extend([
+                        f"12:{minute:02d}",
+                        f"12 बजकर {minute} मिनट",
+                        f"12 बजे {minute} मिनट",
+                    ])
+                present = any(form in text for form in forms + next_day_forms) and (
+                    "अगले दिन" in text or "अगली सुबह" in text or "अगली रात" in text
+                )
         else:
             present = value.lower() in text
         if not present:
